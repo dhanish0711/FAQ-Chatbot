@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CS Institute India Assistant (TF-IDF Enhanced)</title>
+    <!-- Google Fonts: Inter for a clean, tech look -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Modern CSS Variables */
+        :root {
+            --primary-gradient: linear-gradient(135deg, #2563EB 0%, #4F46E5 100%);
+            --chat-bg: rgba(255, 255, 255, 0.85);
+            /* Mesh Gradient Background */
+            --bg-gradient: radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
+                           radial-gradient(at 50% 0%, hsla(225,39%,30%,1) 0, transparent 50%), 
+                           radial-gradient(at 100% 0%, hsla(339,49%,30%,1) 0, transparent 50%);
+            --background-color: #0f172a; /* Slate-900 */
+            --bot-msg-bg: #f1f5f9;
+            --bot-msg-text: #1e293b;
+            --user-msg-bg: #2563EB;
+            --user-msg-text: #ffffff;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background-color);
+            background-image: var(--bg-gradient);
+            background-attachment: fixed;
+            background-size: cover;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Glassmorphism Container */
+        .chat-container {
+            width: 100%;
+            max-width: 440px;
+            height: 90vh;
+            max-height: 800px;
+            background-color: var(--chat-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 24px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Header */
+        .chat-header {
+            background: var(--primary-gradient);
+            color: white;
+            padding: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            z-index: 10;
+        }
+
+        .avatar {
+            width: 45px;
+            height: 45px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            position: relative;
+        }
+
+        .status-dot {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 12px;
+            height: 12px;
+            background-color: #22c55e;
+            border: 2px solid white;
+            border-radius: 50%;
+        }
+
+        .header-info h2 { margin: 0; font-size: 1.1rem; font-weight: 600; }
+        .header-info p { margin: 0; font-size: 0.75rem; opacity: 0.9; }
+
+        /* Chat History */
+        .chat-history {
+            flex: 1;
+            padding: 1.5rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            scroll-behavior: smooth;
+        }
+
+        .chat-history::-webkit-scrollbar { width: 5px; }
+        .chat-history::-webkit-scrollbar-thumb { background-color: rgba(0,0,0,0.1); border-radius: 10px; }
+
+        .message-wrapper { display: flex; flex-direction: column; max-width: 85%; }
+
+        .message {
+            padding: 12px 16px;
+            border-radius: 18px;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            position: relative;
+            word-wrap: break-word;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .bot-wrapper { align-self: flex-start; }
+        .bot-message {
+            background-color: var(--bot-msg-bg);
+            color: var(--bot-msg-text);
+            border-bottom-left-radius: 4px;
+        }
+
+        .user-wrapper { align-self: flex-end; }
+        .user-message {
+            background: var(--primary-gradient);
+            color: var(--user-msg-text);
+            border-bottom-right-radius: 4px;
+        }
+
+        .timestamp {
+            font-size: 0.7rem;
+            color: #64748b;
+            margin-top: 4px;
+            margin-left: 4px;
+        }
+
+        /* Confidence Badge */
+        .confidence-badge {
+            display: inline-block;
+            font-size: 0.65rem;
+            padding: 2px 8px;
+            border-radius: 12px;
+            margin-top: 6px;
+            font-weight: 600;
+        }
+
+        .confidence-high {
+            background-color: #dcfce7;
+            color: #166534;
+        }
+
+        .confidence-medium {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+
+        .confidence-low {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+
+        .method-badge {
+            display: inline-block;
+            font-size: 0.65rem;
+            padding: 2px 8px;
+            border-radius: 12px;
+            margin-left: 4px;
+            background-color: #e0e7ff;
+            color: #3730a3;
+            font-weight: 500;
+        }
+
+        /* Typing Indicator */
+        .typing-indicator {
+            align-self: flex-start;
+            background-color: var(--bot-msg-bg);
+            padding: 12px 16px;
+            border-radius: 18px;
+            border-bottom-left-radius: 4px;
+            display: none;
+            gap: 6px;
+            width: fit-content;
+            margin-bottom: 10px;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            background-color: #94a3b8;
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+        .dot:nth-child(1) { animation-delay: -0.32s; }
+        .dot:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+
+        /* Suggestions */
+        .suggestions-container {
+            border-top: 1px solid rgba(0,0,0,0.05);
+            background: rgba(255,255,255,0.6);
+            backdrop-filter: blur(5px);
+            padding: 10px 0;
+        }
+
+        .suggestions {
+            padding: 0 16px;
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+        .suggestions::-webkit-scrollbar { display: none; }
+
+        .chip {
+            background-color: white;
+            color: #2563EB;
+            border: 1px solid #bfdbfe;
+            padding: 8px 14px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .chip:hover {
+            background-color: #2563EB;
+            color: white;
+            transform: translateY(-1px);
+        }
+
+        /* Input Area */
+        .input-area {
+            padding: 1rem;
+            background-color: rgba(255,255,255,0.9);
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        #user-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 24px;
+            outline: none;
+            transition: all 0.2s;
+            font-size: 0.95rem;
+            background-color: #f8fafc;
+            font-family: 'Inter', sans-serif;
+        }
+
+        #user-input:focus {
+            border-color: #2563EB;
+            background-color: white;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        #send-btn {
+            background: var(--primary-gradient);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 45px;
+            height: 45px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2);
+        }
+        #send-btn:hover { transform: scale(1.05); }
+        #send-btn svg { width: 20px; height: 20px; fill: currentColor; margin-left: 2px; }
+        
+        #send-btn:disabled {
+            background: #cbd5e1;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Debug Toggle */
+        .debug-toggle {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 5px 10px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            cursor: pointer;
+            z-index: 100;
+        }
+
+        .debug-toggle:hover {
+            background-color: rgba(255, 255, 255, 0.3);
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="chat-container">
+        <!-- Header -->
+        <div class="chat-header">
+            <button class="debug-toggle" onclick="toggleDebugMode()">🔍 Debug</button>
+            <div class="avatar">
+                🎓
+                <div class="status-dot"></div>
+            </div>
+            <div class="header-info">
+                <h2>CS Institute India</h2>
+                <p>TF-IDF Powered Assistant</p>
+            </div>
+        </div>
+
+        <!-- Chat History -->
+        <div class="chat-history" id="chat-history">
+            <!-- Bot Welcome -->
+            <div class="message-wrapper bot-wrapper">
+                <div class="message bot-message">
+                    <b>Namaste!</b> 🙏 I am the NICS AI Assistant powered by <b>TF-IDF</b>.<br><br>
+                    I use semantic similarity to understand your questions better!<br>
+                    Try asking: "How much does it cost?" or "Tell me about job placements"
+                </div>
+                <div class="timestamp">Just now</div>
+            </div>
+            
+            <div class="typing-indicator" id="typing-indicator">
+                <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+            </div>
+        </div>
+
+        <!-- Quick Suggestions -->
+        <div class="suggestions-container">
+            <div class="suggestions">
+                <div class="chip" onclick="quickAsk('How much is the tuition?')">💰 Tuition</div>
+                <div class="chip" onclick="quickAsk('What are the entrance exam requirements?')">📝 Exams</div>
+                <div class="chip" onclick="quickAsk('Tell me about career opportunities')">💼 Careers</div>
+                <div class="chip" onclick="quickAsk('Do you have rooms for students?')">🏠 Housing</div>
+                <div class="chip" onclick="quickAsk('How can I join?')">🎓 Join</div>
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="input-area">
+            <input type="text" id="user-input" placeholder="Type your query..." autocomplete="off">
+            <button id="send-btn" onclick="sendMessage()">
+                <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path></svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const chatHistory = document.getElementById('chat-history');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        const typingIndicator = document.getElementById('typing-indicator');
+        let debugMode = false;
+
+        // Focus input on load
+        window.onload = () => userInput.focus();
+
+        // Handle Enter Key
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        function quickAsk(text) {
+            userInput.value = text;
+            sendMessage();
+        }
+
+        function getTimestamp() {
+            return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function toggleDebugMode() {
+            debugMode = !debugMode;
+            const btn = document.querySelector('.debug-toggle');
+            btn.textContent = debugMode ? '🔍 Debug ON' : '🔍 Debug';
+            btn.style.backgroundColor = debugMode ? 'rgba(34, 197, 94, 0.3)' : 'rgba(255, 255, 255, 0.2)';
+        }
+
+        async function sendMessage() {
+            const text = userInput.value.trim();
+            if (text === "") return;
+
+            // 1. UI Updates (Disable input, show user message)
+            userInput.disabled = true;
+            sendBtn.disabled = true;
+            appendMessage(text, 'user-wrapper', 'user-message');
+            userInput.value = '';
+            
+            // 2. Show typing indicator
+            typingIndicator.style.display = 'flex';
+            scrollToBottom();
+
+            try {
+                // 3. Send request to Flask Backend
+                const response = await fetch('/get_response', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text })
+                });
+
+                const data = await response.json();
+                
+                // If debug mode is on, also fetch debug info
+                let debugInfo = null;
+                if (debugMode) {
+                    const debugResponse = await fetch('/debug', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: text })
+                    });
+                    debugInfo = await debugResponse.json();
+                }
+                
+                // 4. Simulate small network delay for realism, then show response
+                setTimeout(() => {
+                    typingIndicator.style.display = 'none';
+                    
+                    let responseText = data.response;
+                    
+                    // Add confidence and method badges
+                    const confidence = data.confidence || 0;
+                    const method = data.method || 'unknown';
+                    
+                    let confidenceClass = 'confidence-low';
+                    if (confidence >= 0.3) confidenceClass = 'confidence-high';
+                    else if (confidence >= 0.15) confidenceClass = 'confidence-medium';
+                    
+                    const badges = `<br><span class="confidence-badge ${confidenceClass}">Confidence: ${(confidence * 100).toFixed(1)}%</span><span class="method-badge">${method.toUpperCase()}</span>`;
+                    
+                    responseText += badges;
+                    
+                    // Add debug info if enabled
+                    if (debugMode && debugInfo) {
+                        responseText += `<br><br><small style="color: #64748b;"><b>Debug Info:</b><br>`;
+                        responseText += `Query: "${debugInfo.query}"<br>`;
+                        responseText += `Preprocessed: [${debugInfo.preprocessed.join(', ')}]<br>`;
+                        responseText += `Top Matches:<br>`;
+                        debugInfo.results.slice(0, 3).forEach((r, i) => {
+                            responseText += `${i+1}. ${r.faq}: ${(r.similarity * 100).toFixed(1)}%<br>`;
+                        });
+                        responseText += `</small>`;
+                    }
+                    
+                    appendMessage(responseText, 'bot-wrapper', 'bot-message');
+                    userInput.disabled = false;
+                    sendBtn.disabled = false;
+                    userInput.focus();
+                }, 400);
+
+            } catch (error) {
+                console.error("Error:", error);
+                typingIndicator.style.display = 'none';
+                appendMessage("Sorry, I'm having trouble connecting to the server.", 'bot-wrapper', 'bot-message');
+                userInput.disabled = false;
+                sendBtn.disabled = false;
+            }
+        }
+
+        function appendMessage(htmlText, wrapperClass, messageClass) {
+            const wrapperDiv = document.createElement('div');
+            wrapperDiv.className = `message-wrapper ${wrapperClass}`;
+            
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${messageClass}`;
+            msgDiv.innerHTML = htmlText;
+            
+            const timeDiv = document.createElement('div');
+            timeDiv.className = 'timestamp';
+            timeDiv.innerText = getTimestamp();
+
+            wrapperDiv.appendChild(msgDiv);
+            wrapperDiv.appendChild(timeDiv);
+
+            chatHistory.insertBefore(wrapperDiv, typingIndicator);
+            scrollToBottom();
+        }
+
+        function scrollToBottom() {
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+    </script>
+</body>
+</html>
